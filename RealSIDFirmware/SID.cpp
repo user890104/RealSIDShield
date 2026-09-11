@@ -30,98 +30,191 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "SID.h"
 
-void SID::Reset() 
+void SID::Select()
 {
-  char addr;
-  
-  // Set up 74574 clock
-  pinMode(12, OUTPUT);
-  digitalWrite(12, LOW);
-  
-  // Set up SID chip select
-  pinMode(11, OUTPUT);
-  digitalWrite(11, HIGH);
+  digitalWrite(SID_CS, LOW);
+}
+
+void SID::Deselect()
+{
+  digitalWrite(SID_CS, HIGH);
+}
+
+void SID::LatchAddress()
+{
+  digitalWrite(LATCH_CLOCK, HIGH);
+}
+
+void SID::UnlatchAddress()
+{
+  digitalWrite(LATCH_CLOCK, LOW);
+}
+
+void SID::DataBusOutput()
+{
+  pinMode(DATA_0, OUTPUT);
+  pinMode(DATA_1, OUTPUT);
+  pinMode(DATA_2, OUTPUT);
+  pinMode(DATA_3, OUTPUT);
+  pinMode(DATA_4, OUTPUT);
+  pinMode(DATA_5, OUTPUT);
+  pinMode(DATA_6, OUTPUT);
+  pinMode(DATA_7, OUTPUT);
+}
+
+void SID::DataBusInput()
+{
+  pinMode(DATA_0, INPUT);
+  pinMode(DATA_1, INPUT);
+  pinMode(DATA_2, INPUT);
+  pinMode(DATA_3, INPUT);
+  pinMode(DATA_4, INPUT);
+  pinMode(DATA_5, INPUT);
+  pinMode(DATA_6, INPUT);
+  pinMode(DATA_7, INPUT);
+}
+
+uint8_t SID::ReadDataBus()
+{
+  uint8_t value = 0;
+
+  value |= digitalRead(DATA_0) << 0;
+  value |= digitalRead(DATA_1) << 1;
+  value |= digitalRead(DATA_2) << 2;
+  value |= digitalRead(DATA_3) << 3;
+  value |= digitalRead(DATA_4) << 4;
+  value |= digitalRead(DATA_5) << 5;
+  value |= digitalRead(DATA_6) << 6;
+  value |= digitalRead(DATA_7) << 7;
+
+  return value;
+}
+
+void SID::WriteDataBus(uint8_t value)
+{
+  digitalWrite(DATA_0, bitRead(value, 0));
+  digitalWrite(DATA_1, bitRead(value, 1));
+  digitalWrite(DATA_2, bitRead(value, 2));
+  digitalWrite(DATA_3, bitRead(value, 3));
+  digitalWrite(DATA_4, bitRead(value, 4));
+  digitalWrite(DATA_5, bitRead(value, 5));
+  digitalWrite(DATA_6, bitRead(value, 6));
+  digitalWrite(DATA_7, bitRead(value, 7));
+}
+
+void SID::WriteAddress(uint8_t address, uint8_t read)
+{
+  digitalWrite(DATA_0, bitRead(address, 0));
+  digitalWrite(DATA_1, bitRead(address, 1));
+  digitalWrite(DATA_2, bitRead(address, 2));
+  digitalWrite(DATA_3, bitRead(address, 3));
+  digitalWrite(DATA_4, bitRead(address, 4));
+  digitalWrite(DATA_5, read ? HIGH : LOW);
+}
+
+void SID::Setup()
+{
+  // Set up 74574 clock, output, inactive
+  pinMode(LATCH_CLOCK, OUTPUT);
+  UnlatchAddress();
+
+  // Set up SID chip select, output, inactive
+  pinMode(SID_CS, OUTPUT);
+  Deselect();
 
   // Copied from the SIDaster project:
-  // 1MHz generation on OC1A - Clk 16 MHz - set pin 10 as OC1A output
+  // 1MHz generation on OC1B - Clk 16 MHz
+
+  // set pin 10 as OC1B output
+  pinMode(SID_CLOCK, OUTPUT);
+
   // Reset settings of Timer/Counter register 1
-  // Set compare match output A to toogle
-  // Set waveform generation mode to CTC (Clear Counter on Match)
-  // Set clock select to clock/1024 (from prescaler)
-  // Set output compare register A to 8 (i.e. OC1A Toggle every 7+1=8 Clk pulses)
-  pinMode(10, OUTPUT);
   TCCR1A &= ~((1<<COM1B1) | (1<<COM1B0) | (1<<WGM11) | (1<<WGM10));
   TCCR1B &= ~((1<<WGM13) | (1<<WGM12) | (1<<CS12) | (1<<CS11) | (1<<CS10));
+
+  // Set compare match output B to toogle
   TCCR1A |= (0<<COM1B1) | (1<<COM1B0);
+
+  // Set waveform generation mode to CTC (Clear Counter on Match)
   TCCR1A |= (0<<WGM11) | (0<<WGM10);
   TCCR1B |= (0<<WGM13) | (1<<WGM12);
+
+  // No prescaler
   TCCR1B |= (0<<CS12) | (0<<CS11) | (1<<CS10);
+
+  // Set output compare register A to 8 (i.e. OC1B Toggle every 7+1=8 Clk pulses)
   OCR1A = 7;
 
+  // delay 1 PAL frame = 50 Hz
+  delay(20);
+
   // Reset SID
-  delayMicroseconds(20000);
-  pinMode(13, OUTPUT);
-  digitalWrite(13, LOW);
-  delayMicroseconds(20000);
-  digitalWrite(13, HIGH);
-  delayMicroseconds(20000);
+  pinMode(SID_RESET, OUTPUT);
+
+  digitalWrite(SID_RESET, LOW);
+  delay(20);
+
+  digitalWrite(SID_RESET, HIGH);
+  delay(20);
+
+  // Data bus is output by default
+  DataBusOutput();
 
   // Reset SID registers (0..24 are write-only and 25...28 are read-only)
-  for(addr = 0; addr < 25; addr++)
-    Poke(addr, 0);
+  for (uint8_t address = 0; address < 25; address++)
+    Poke(address, 0);
 }
 
-void SID::Poke(char addr, char value)
+void SID::Poke(uint8_t address, uint8_t value)
 {
-  // Set databus in output mode
-  DDRD |= 0b11111110;
-  DDRB |= 0b00111111;
-  
-  // Disable SID
-  PORTB |= 0b00001000;
+  // deselect before accessing the bus
+  Deselect();
 
-  // Address bits 0 and 1 goes to B0 and B1 and bits 2..4 goes to D2...D4. The write-bit goes implicitly to D5.
-  PORTB = (PORTB & 0b11111100) | (addr & 0b00000011);
-  PORTD = (PORTD & 0b11000011) | (addr & 0b00011100);
+  // Address bits 0 and 1 goes to B0 and B1 and bits 2..4 goes to D2...D4. The write-bit goes to D5.
+  WriteAddress(address, false);
 
   // Pulse the 74374's clock
-  PORTB |= 0b00010000;
-  PORTB &= 0b11101111;
+  LatchAddress();
+  UnlatchAddress();
   
   // Put the value on the databus
-  PORTB = (PORTB & 0b11111100) | (value & 0b00000011);
-  PORTD = (PORTD & 0b00000011) | (value & 0b11111100);
-  
-  // Enable SID
-  PORTB &= 0b11110111;
+  WriteDataBus(value);
+
+  // Make the SID read our values
+  Select();
+  delayMicroseconds(1);
+  Deselect();
 }
 
-char SID::Peek(char addr)
+uint8_t SID::Peek(uint8_t address)
 {
-  // Set databus in output mode
-  DDRD |= 0b11111110;
-  DDRB |= 0b00111111;
-  
-  // Disable SID
-  PORTB |= 0b00001000;
+  uint8_t result = 0;
+
+  // deselect before accessing the bus
+  Deselect();
 
   // Put address and R/W bit on databus
   // Address bits 0 and 1 goes to B0 and B1 and bits 2..4 goes to D2...D4. The read-bit goes to D5.
-  PORTB = (PORTB & 0b11111100) | (addr & 0b00000011);
-  PORTD = (PORTD & 0b11000011) | (addr & 0b00011100) | 0b00010000;
+  WriteAddress(address, true);
   
   // Pulse the 74374's clock
-  PORTB |= 0b00010000;
-  PORTB &= 0b11101111;
+  LatchAddress();
+  UnlatchAddress();
 
   // Set databus in input mode
-  DDRD &= 0b00000011;
-  DDRB &= 0b11111100;
+  DataBusInput();
 
   // Enable SID and wait one clock cycle (more or less)
-  PORTB &= 0b11110111;
+  Select();
   delayMicroseconds(1);
   
   // Read databus and return
-  return (PINB & 0b00000011) | (PIND & 0b11111100);
+  result = ReadDataBus();
+
+  Deselect();
+
+  // Revert data bus to output
+  DataBusOutput();
+
+  return result;
 }

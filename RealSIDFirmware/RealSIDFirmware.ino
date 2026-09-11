@@ -41,7 +41,7 @@ SID SIDchip;
 void setup()
 {
   Serial.begin(115200);
-  SIDchip.Reset();
+  SIDchip.Setup();
 }
 
 char decode(char ch)
