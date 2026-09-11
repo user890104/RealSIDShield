@@ -43,6 +43,8 @@ void setup()
 {
   Serial.begin(115200);
   SIDchip.Setup();
+  Serial.write('?');
+  Serial.flush();
 }
 
 void readData()
