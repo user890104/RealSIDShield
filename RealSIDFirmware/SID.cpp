@@ -28,7 +28,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <avr/io.h>
+#include <Arduino.h>
+
+#include "Pins.h"
 #include "SID.h"
+#include "Latch.h"
+
+Latch LatchChip;
 
 void SID::Select()
 {
@@ -38,16 +45,6 @@ void SID::Select()
 void SID::Deselect()
 {
   digitalWrite(SID_CS, HIGH);
-}
-
-void SID::LatchAddress()
-{
-  digitalWrite(LATCH_CLOCK, HIGH);
-}
-
-void SID::UnlatchAddress()
-{
-  digitalWrite(LATCH_CLOCK, LOW);
 }
 
 void SID::DataBusOutput()
@@ -102,21 +99,9 @@ void SID::WriteDataBus(uint8_t value)
   digitalWrite(DATA_7, bitRead(value, 7));
 }
 
-void SID::WriteAddress(uint8_t address, uint8_t read)
-{
-  digitalWrite(DATA_0, bitRead(address, 0));
-  digitalWrite(DATA_1, bitRead(address, 1));
-  digitalWrite(DATA_2, bitRead(address, 2));
-  digitalWrite(DATA_3, bitRead(address, 3));
-  digitalWrite(DATA_4, bitRead(address, 4));
-  digitalWrite(DATA_5, read ? HIGH : LOW);
-}
-
 void SID::Setup()
 {
-  // Set up 74574 clock, output, inactive
-  pinMode(LATCH_CLOCK, OUTPUT);
-  UnlatchAddress();
+  LatchChip.Setup();
 
   // Set up SID chip select, output, inactive
   pinMode(SID_CS, OUTPUT);
@@ -170,13 +155,9 @@ void SID::Poke(uint8_t address, uint8_t value)
   // deselect before accessing the bus
   Deselect();
 
-  // Address bits 0 and 1 goes to B0 and B1 and bits 2..4 goes to D2...D4. The write-bit goes to D5.
-  WriteAddress(address, false);
+  // set address, set r/w to write
+  LatchChip.SetAddress(address, false);
 
-  // Pulse the 74374's clock
-  LatchAddress();
-  UnlatchAddress();
-  
   // Put the value on the databus
   WriteDataBus(value);
 
@@ -193,13 +174,8 @@ uint8_t SID::Peek(uint8_t address)
   // deselect before accessing the bus
   Deselect();
 
-  // Put address and R/W bit on databus
-  // Address bits 0 and 1 goes to B0 and B1 and bits 2..4 goes to D2...D4. The read-bit goes to D5.
-  WriteAddress(address, true);
-  
-  // Pulse the 74374's clock
-  LatchAddress();
-  UnlatchAddress();
+  // set address, set r/w to read
+  LatchChip.SetAddress(address, true);
 
   // Set databus in input mode
   DataBusInput();
