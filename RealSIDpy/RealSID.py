@@ -82,6 +82,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
         print("Warning: RSID files may not play properly. YMMV.")
 
     dataoffset = (data[6] << 8) | data[7]
+    print("Data offset: {0:04X}".format(dataoffset))
 
     loadaddress = (data[8] << 8) | data[9]
     print("Load address: {0:04X}".format(loadaddress))
