@@ -31,11 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "SID.h"
 
 int idx = 0;
-char buffer[25];
+char buffer[26];
 char newsid[25];
 char oldsid[25];
 bool dataconsumed = true;
 unsigned long lastupdate = 0;
+int updatems = 0;
 
 SID SIDchip;
 
@@ -49,15 +50,24 @@ void setup()
 
 void readData()
 {
+  char ch;
+
   if (Serial.available() == 0)
     return;
 
   buffer[idx++] = Serial.read();
 
-  if (idx >= 25) {
+  if (idx >= 26) {
     idx = 0;
-    memcpy(newsid, buffer, sizeof(newsid));
-    dataconsumed = false;
+
+    if (buffer[0] == 0) {
+      memcpy(newsid, buffer + 1, sizeof(newsid));
+      dataconsumed = false;
+    }
+
+    if (buffer[0] == 1) {
+      updatems = buffer[1];
+    }
   }
 }
 
@@ -75,10 +85,13 @@ void updateSID()
 
 void checkUpdateSid(void)
 {
+  if (!updatems)
+    return;
+
   // Check time and update SID if needed
   unsigned long timenow = millis();
 
-  if (timenow - lastupdate < 20)
+  if (timenow - lastupdate < updatems)
     return;
 
   lastupdate = timenow;

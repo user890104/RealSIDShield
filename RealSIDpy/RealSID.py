@@ -38,6 +38,8 @@ import serial
 import argparse
 from py65.devices import mpu6502
 
+vstdtxt = ['Unknown', 'PAL', 'NTSC', 'PAL/NTSC']
+
 def runCPU(cpu, newpc, newa, newx, newy):
     cpu.pc = newpc
     cpu.a = newa
@@ -95,14 +97,29 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
         subtune = defaultsong
 
     speed = (data[18] << 24) | (data[19] << 16) | (data[20] << 8) | data[21]
-    if speed == 0:
-        print("Using 50Hz vertical blank interrupt.")
-    else:
-        print("Warning: Some songs require the CIA 1 timer (not implemented).")
+    print("Speed    : {0:08X}".format(speed))
+    speedbit = (speed >> (subtune - 1)) & 1
 
     print("Title    : {0}".format(data[22:54].decode('ascii')))
     print("Author   : {0}".format(data[54:86].decode('ascii')))
     print("Released : {0}".format(data[86:118].decode('ascii')))
+
+    if speedbit == 0:
+        if version >= 2:
+            flags = (data[118] << 8) | data[119]
+            vstd = (flags & 0xC) >> 2
+            print("Video standard: {}".format(vstdtxt[vstd]))
+            if flags & 0x8:
+                playback_hz = 60
+            else:
+                playback_hz = 50
+        else:
+            playback_hz = 50
+
+        print("Using {0}Hz vertical blank interrupt.".format(playback_hz))
+    else:
+        print("Using the CIA 1 timer @ 60Hz.")
+        playback_hz = 60
 
     ## Check load address
     if loadaddress == 0:
@@ -143,23 +160,34 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     print("Using serial port {0} at {1} baud...".format(serialport, baudrate))
     print("Initializing serial connection to the Arduino...")
     ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=1)
-    time.sleep(0.1)
-    ser.flushInput()
+
+    while ser.read() != b"?":
+        print('.', end='', flush=True)
+
+    print()
+
+    ## Configure the speed
+    cmd = [0] * 26
+    cmd[0] = 1 # type=config
+    cmd[1] = round(1000 / playback_hz)
+    ser.write(cmd)
+    ser.flush()
 
     ## Play SID tune!
     if playseconds == -1:
         print("Playing...")
     else:
         print("Playing for {0} seconds...".format(playseconds))
-    frames = 0
-    while playseconds == -1 or frames < playseconds * 50:
+    play_calls = 0
+    while playseconds == -1 or play_calls < playseconds * playback_hz:
         if ser.read() == b"?":
             runCPU(cpu, playaddress, 0, 0, 0)
+            ser.write([0]) # type=registers
             ser.write(memory[0xD400:0xD419])
             ser.flush()
-            frames += 1
+            play_calls += 1
         else:
-            print("I/O error...")
+            print("Board did not send a data request...")
 
     ser.flush()
     ser.close()
