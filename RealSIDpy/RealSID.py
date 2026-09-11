@@ -91,7 +91,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     songs = (data[14] << 8) | data[15]
     defaultsong = (data[16] << 8) | data[17]
     print("Found {0} song(s) (default song is {1})".format(songs, defaultsong))
-    if subtune == -1 or subtune > songs:
+    if subtune < 1 or subtune > songs:
         subtune = defaultsong
 
     speed = (data[18] << 24) | (data[19] << 16) | (data[20] << 8) | data[21]
