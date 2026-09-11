@@ -30,12 +30,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "SID.h"
 
+int idx = 0;
+char buffer[25];
 char newsid[25];
 char oldsid[25];
-bool dataready = false;
-char buffer[50];
-int idx = 0;
+bool dataconsumed = true;
 unsigned long lastupdate = 0;
+
 SID SIDchip;
 
 void setup()
@@ -44,72 +45,54 @@ void setup()
   SIDchip.Setup();
 }
 
-char decode(char ch)
+void readData()
 {
-  if (ch >= 'A')
-    return ch - 55;
-  else
-    return ch - 48;
+  if (Serial.available() == 0)
+    return;
+
+  buffer[idx++] = Serial.read();
+
+  if (idx >= 25) {
+    idx = 0;
+    memcpy(newsid, buffer, sizeof(newsid));
+    dataconsumed = false;
+  }
 }
 
 void updateSID()
 {
   for (int i = 0; i < 25; i++)
   {
-    if (oldsid[i] != newsid[i])
-    {
-      oldsid[i] = newsid[i];
-      SIDchip.Poke(i, newsid[i]);
-    }
+    if (oldsid[i] == newsid[i])
+      continue;
+
+    SIDchip.Poke(i, newsid[i]);
+    oldsid[i] = newsid[i];
   }
 }
 
-void readData()
+void checkUpdateSid(void)
 {
-  if (Serial.available() > 0)
-  {
-      char ch = Serial.read();
-      if (ch == '!')
-      {
-        if (idx == 50)
-        {
-          for (int i = 0; i < 25; i++)
-          {
-            char highnibble = buffer[i * 2];
-            char lownibble = buffer[i * 2 + 1];
-            newsid[i] = (decode(highnibble) << 4) | decode(lownibble);
-          }
-          dataready = true;
-        }
-        idx = 0;
-      }
-      else
-      {
-        if (idx < 50)
-          buffer[idx] = ch;
-        idx++;
-      }
+  // Check time and update SID if needed
+  unsigned long timenow = millis();
+
+  if (timenow - lastupdate < 20)
+    return;
+
+  lastupdate = timenow;
+
+  if (!dataconsumed) {
+    updateSID();
+    dataconsumed = true;
   }
+
+  // Send more data!
+  Serial.write('?');
+  Serial.flush();
 }
 
 void loop()
 {
-  if (!dataready)
-    readData();
-  
-  // Check time and update SID if needed
-  unsigned long timenow = millis();
-  if (timenow - lastupdate >= 20)
-  {
-    lastupdate = timenow;
-    if (dataready == true)
-    {
-      dataready = false;
-      updateSID();
-    }
-  
-    // Send more data!
-    Serial.write('?');
-    Serial.flush();
-  }
+  readData();
+  checkUpdateSid();
 }

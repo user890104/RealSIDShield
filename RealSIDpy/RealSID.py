@@ -38,11 +38,6 @@ import serial
 import argparse
 from py65.devices import mpu6502
 
-
-def getSIDstate(memory):
-    return ''.join([format(byte, '02X') for byte in memory[0xD400:0xD419]]).encode('ascii')
-
-
 def runCPU(cpu, newpc, newa, newx, newy):
     cpu.pc = newpc
     cpu.a = newa
@@ -160,7 +155,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     while playseconds == -1 or frames < playseconds * 50:
         if ser.read() == b"?":
             runCPU(cpu, playaddress, 0, 0, 0)
-            ser.write(getSIDstate(memory) + b"!")
+            ser.write(memory[0xD400:0xD419])
             ser.flush()
             frames += 1
         else:
