@@ -161,6 +161,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     print('Initializing serial connection to the Arduino...')
     ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=1)
 
+    print('Connecting...', end='', flush=True)
     while ser.read() != b'?':
         print('.', end='', flush=True)
 
