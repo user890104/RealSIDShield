@@ -66,6 +66,7 @@ void readData()
     }
 
     if (buffer[0] == 1) {
+      SIDchip.Reset();
       updatems = buffer[1];
     }
   }
