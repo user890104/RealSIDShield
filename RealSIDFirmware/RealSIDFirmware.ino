@@ -57,7 +57,7 @@ void readData()
 
   buffer[idx++] = Serial.read();
 
-  if (idx >= 26) {
+  if (idx >= sizeof(buffer)) {
     idx = 0;
 
     if (buffer[0] == 0) {
@@ -74,7 +74,7 @@ void readData()
 
 void updateSID()
 {
-  for (int i = 0; i < 25; i++)
+  for (int i = 0; i < sizeof(newsid); i++)
   {
     if (oldsid[i] == newsid[i])
       continue;
