@@ -69,7 +69,7 @@ def run_cpu(cpu, new_pc, new_a, new_x, new_y):
 
     return instruction_count
 
-def play_sid(filename, song, play_seconds, serial_port, baud_rate):
+def play_sid(filename, song, play_seconds, port, baud_rate):
     ## Parse file
     sid = Sid.from_path(filename)
     header = sid.header
@@ -116,13 +116,13 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
     print(f'Author   : {header.author}')
     print(f'Released : {header.released}')
 
-    dataOffset = 0
+    data_offset = 0
 
     ## Check load address
     if header.loadAddress == 0:
         print('Warning: SID has load address 0, reading from C64 binary data')
         load_address = sid.data[0] | (sid.data[1] << 8)
-        dataOffset = 2
+        data_offset = 2
         print(f'New load address is {load_address:04X}')
     else:
         load_address = header.loadAddress
@@ -138,7 +138,7 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
     ## Setup memory
     memory = [0] * 0x10000
     memory[0x01] = 0x37
-    for idx, byte in enumerate(sid.data[dataOffset:]):
+    for idx, byte in enumerate(sid.data[data_offset:]):
         memory[load_address + idx] = byte
 
     ## Setup CPU
@@ -162,15 +162,15 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
         play_address = header.playAddress
 
     ## Init RealSIDShield and wait for it to reset properly
-    print(f'Using serial port {serial_port} at {baud_rate} baud...')
+    print(f'Using serial port {port} at {baud_rate} baud...')
     print('Initializing serial connection to the Arduino...')
-    serial = Serial(port=serial_port, baudrate=baud_rate, timeout=0.1)
+    serial_port = Serial(port=port, baudrate=baud_rate, timeout=0.1)
     sleep(0.01)
-    serial.reset_input_buffer()
+    serial_port.reset_input_buffer()
 
     print('Connecting...', end='', flush=True)
     retries = 30
-    while serial.read() != b'?' and retries > 0:
+    while serial_port.read() != b'?' and retries > 0:
         retries -= 1
         print('.', end='', flush=True)
 
@@ -178,15 +178,15 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
 
     if retries == 0:
         print('Connection timed out')
-        serial.close()
+        serial_port.close()
         return
 
     ## Configure the speed
     config_cmd = [0] * 26
     config_cmd[0] = 1 # type=config
     config_cmd[1] = round(1000 / playback_frequency)
-    serial.write(config_cmd)
-    serial.flush()
+    serial_port.write(config_cmd)
+    serial_port.flush()
 
     ## Play SID tune!
     if play_seconds == -1:
@@ -199,18 +199,18 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
 
     while (play_seconds == -1 or play_calls < play_seconds * playback_frequency) and retries > 0:
         try:
-            request = serial.read()
+            request = serial_port.read()
         except KeyboardInterrupt:
             # config_cmd resets the SID, which stops the sound
-            serial.write(config_cmd)
-            serial.flush()
+            serial_port.write(config_cmd)
+            serial_port.flush()
             break
 
         if request == b'?':
             run_cpu(cpu, play_address, 0, 0, 0)
-            serial.write([0]) # type=registers
-            serial.write(memory[0xD400:0xD419])
-            serial.flush()
+            serial_port.write([0]) # type=registers
+            serial_port.write(memory[0xD400:0xD419])
+            serial_port.flush()
             play_calls += 1
             retries = 10
         else:
@@ -220,7 +220,7 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
     if retries == 0:
         print('Connection timed out')
 
-    serial.close()
+    serial_port.close()
 
 
 if __name__ == '__main__':
