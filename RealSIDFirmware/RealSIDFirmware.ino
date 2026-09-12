@@ -30,13 +30,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "SID.h"
 
-int idx = 0;
-char buffer[26];
-char newsid[25];
-char oldsid[25];
+uint8_t idx = 0;
+uint8_t buffer[26];
+uint8_t newsid[25];
+uint8_t oldsid[25];
 bool dataconsumed = true;
 unsigned long lastupdate = 0;
-int updatems = 0;
+uint8_t updatems = 0;
 
 SID SIDchip;
 
@@ -50,8 +50,6 @@ void setup()
 
 void readData()
 {
-  char ch;
-
   if (Serial.available() == 0)
     return;
 
