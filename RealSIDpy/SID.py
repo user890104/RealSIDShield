@@ -52,34 +52,32 @@ class SidHeader:
             if f.metadata.get('version', 1) == 1
         ]
 
-        values = HEADER_V1.unpack(data[:HEADER_V1.size])
-
-        cls_dict = dict(zip(
+        values = dict(zip(
             (f.name for f in v1_fields),
-            values,
+            HEADER_V1.unpack(data[:HEADER_V1.size]),
         ))
 
-        cls_dict['magicID'] = cls_dict['magicID'].decode('ascii')
+        values['magicID'] = values['magicID'].decode('ascii')
+        version = values['version']
 
         for key in ('name', 'author', 'released'):
-            cls_dict[key] = cls_dict[key].rstrip(b'\0').decode('latin-1')
+            values[key] = values[key].rstrip(b'\0').decode('latin-1')
 
-        if cls_dict['version'] >= 2:
+        if version >= 2:
             v2_fields = [
                 f for f in fields(cls)
-                if f.metadata.get('version', 1) == 2
+                if f.metadata.get('version', 1) > 1
+                and f.metadata.get('version', 1) <= version
             ]
 
-            values = HEADER_V2.unpack(
-                data[HEADER_V1.size:HEADER_V1.size + HEADER_V2.size]
-            )
-
-            cls_dict.update(dict(zip(
+            values.update(dict(zip(
                 (f.name for f in v2_fields),
-                values,
+                HEADER_V2.unpack(
+                    data[HEADER_V1.size:HEADER_V1.size + HEADER_V2.size]
+                ),
             )))
 
-        instance = cls(**cls_dict)
+        instance = cls(**values)
         instance.validate()
 
         return instance
