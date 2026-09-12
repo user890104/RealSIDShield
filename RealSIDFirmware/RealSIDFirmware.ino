@@ -50,22 +50,25 @@ void setup()
 
 void readData()
 {
-  if (Serial.available() == 0)
-    return;
+  while (Serial.available()) {
+    buffer[idx++] = Serial.read();
 
-  buffer[idx++] = Serial.read();
-
-  if (idx >= sizeof(buffer)) {
-    idx = 0;
-
-    if (buffer[0] == 0) {
-      memcpy(newsid, buffer + 1, sizeof(newsid));
-      dataconsumed = false;
+    if (idx < sizeof(buffer)) {
+      continue;
     }
 
-    if (buffer[0] == 1) {
-      SIDchip.Reset();
-      updatems = buffer[1];
+    // complete packet received, reset buffer pos and process the packet
+    idx = 0;
+
+    switch (buffer[0]) {
+      case 0:
+        memcpy(newsid, buffer + 1, sizeof(newsid));
+        dataconsumed = false;
+        break;
+      case 1:
+        SIDchip.Reset();
+        updatems = buffer[1];
+        break;
     }
   }
 }
