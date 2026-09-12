@@ -97,7 +97,7 @@ def play_sid(filename, song, play_seconds, serial_port, baud_rate):
 
     if song_speed == 0:
         if header.version >= 2:
-            video_standard = (header.flags >> 2) & 0x2
+            video_standard = (header.flags >> 2) & 0x3
             print(f'Video standard: {video_standard_text[video_standard]}')
 
             if video_standard & 0x2:
