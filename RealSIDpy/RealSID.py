@@ -162,7 +162,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=0.1)
 
     print('Connecting...', end='', flush=True)
-    retries = 50
+    retries = 30
     while ser.read() != b'?' and retries > 0:
         retries -= 1
         print('.', end='', flush=True)
