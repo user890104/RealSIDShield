@@ -177,9 +177,11 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
         return
 
     ## Configure the speed
+    update_ms = round(1000 / playback_hz)
+
     cmd = [0] * 26
     cmd[0] = 1 # type=config
-    cmd[1] = round(1000 / playback_hz)
+    cmd[1] = update_ms
     ser.write(cmd)
     ser.flush()
 
@@ -191,7 +193,17 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     play_calls = 0
     retries = 10
     while (playseconds == -1 or play_calls < playseconds * playback_hz) and retries > 0:
-        if ser.read() == b'?':
+        try:
+            request = ser.read()
+        except KeyboardInterrupt:
+            cmd = [0] * 26
+            cmd[0] = 1 # type=config
+            cmd[1] = update_ms
+            ser.write(cmd)
+            ser.flush()
+            break
+
+        if request == b'?':
             runCPU(cpu, playaddress, 0, 0, 0)
             ser.write([0]) # type=registers
             ser.write(memory[0xD400:0xD419])
@@ -205,7 +217,6 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     if retries == 0:
         print('Connection timed out')
 
-    ser.flush()
     ser.close()
 
 
