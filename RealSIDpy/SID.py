@@ -89,7 +89,7 @@ class SidHeader:
             raise ValueError(f'Unsupported file type: {self.magicID}')
 
         if self.version == 1 and self.dataOffset != 0x0076 or self.version in (2, 3, 4) and self.dataOffset != 0x007C:
-            raise ValueError(f'Wrong dataOffset for version {sid.version}: {sid.dataOffset:04X}')
+            raise ValueError(f'Wrong dataOffset for version {self.version}: {self.dataOffset:04X}')
 
         if self.magicID == 'RSID' and (self.initAddress >= 0xA000 and self.initAddress < 0xC000 or self.initAddress >= 0xD000 or self.initAddress < 0x07E8):
             raise ValueError(f'Wrong initAddress for RSID: {self.initAddress:04X}')
