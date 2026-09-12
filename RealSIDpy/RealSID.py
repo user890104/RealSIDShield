@@ -159,13 +159,20 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     ## Init RealSIDShield and wait for it to reset properly
     print('Using serial port {0} at {1} baud...'.format(serialport, baudrate))
     print('Initializing serial connection to the Arduino...')
-    ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=1)
+    ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=0.1)
 
     print('Connecting...', end='', flush=True)
-    while ser.read() != b'?':
+    retries = 50
+    while ser.read() != b'?' and retries > 0:
+        retries -= 1
         print('.', end='', flush=True)
 
     print()
+
+    if retries == 0:
+        print('Connection timed out')
+        ser.close()
+        return
 
     ## Configure the speed
     cmd = [0] * 26
@@ -180,15 +187,21 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     else:
         print('Playing for {0} seconds...'.format(playseconds))
     play_calls = 0
-    while playseconds == -1 or play_calls < playseconds * playback_hz:
+    retries = 10
+    while (playseconds == -1 or play_calls < playseconds * playback_hz) and retries > 0:
         if ser.read() == b'?':
             runCPU(cpu, playaddress, 0, 0, 0)
             ser.write([0]) # type=registers
             ser.write(memory[0xD400:0xD419])
             ser.flush()
             play_calls += 1
+            retries = 10
         else:
             print('Board did not send a data request...')
+            retries -= 1
+
+    if retries == 0:
+        print('Connection timed out')
 
     ser.flush()
     ser.close()
