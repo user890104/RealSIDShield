@@ -44,6 +44,7 @@ class SID
 
   public:
     void Setup();
+    void SID::Reset(void);
     void Poke(uint8_t address, uint8_t value);
     uint8_t Peek(uint8_t address);
 };

@@ -145,6 +145,11 @@ void SID::Setup()
   // Data bus is output by default
   DataBusOutput();
 
+  Reset();
+}
+
+void SID::Reset(void)
+{
   // Reset SID registers (0..24 are write-only and 25...28 are read-only)
   for (uint8_t address = 0; address < 25; address++)
     Poke(address, 0);
