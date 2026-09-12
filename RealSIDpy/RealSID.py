@@ -33,22 +33,24 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
-import time
-import serial
-import argparse
+from time import sleep
+from argparse import ArgumentParser
+from serial import Serial
 from py65.devices import mpu6502
+from SID import Sid
 
-vstdtxt = ['Unknown', 'PAL', 'NTSC', 'PAL/NTSC']
+video_standard_text = ['Unknown', 'PAL', 'NTSC', 'PAL/NTSC']
 
-def runCPU(cpu, newpc, newa, newx, newy):
-    cpu.pc = newpc
-    cpu.a = newa
-    cpu.x = newx
-    cpu.y = newy
+def run_cpu(cpu, new_pc, new_a, new_x, new_y):
+    cpu.pc = new_pc
+    cpu.a = new_a
+    cpu.x = new_x
+    cpu.y = new_y
     cpu.sp = 0xFF
     running = True
-    instructioncount = 0
-    while running and instructioncount < 1000000:
+    instruction_count = 0
+
+    while running and instruction_count < 1_000_000:
         ## Test for return instructions RTI (0x40) and RTS (0x60)
         if cpu.ByteAt(cpu.pc) in (0x40, 0x60) and cpu.sp == 0xFF:
             running = False
@@ -59,113 +61,116 @@ def runCPU(cpu, newpc, newa, newx, newy):
 
         ## Step one instruction
         cpu.step()
-        instructioncount += 1
+        instruction_count += 1
 
         ## Test for jump into Kernal interrupt handler exit
-        if (cpu.ByteAt(0x01) & 0x07) != 0x5 and cpu.pc in (0xea31, 0xea81):
+        if (cpu.ByteAt(0x01) & 0x07) != 0x05 and cpu.pc in (0xea31, 0xea81):
             running = False
 
+    return instruction_count
 
-def playsid(filename, subtune, playseconds, serialport, baudrate):
-    ## Parse file header
-    with open(filename, 'rb') as sidfile:
-        data = sidfile.read()
+def play_sid(filename, song, play_seconds, serial_port, baud_rate):
+    ## Parse file
+    sid = Sid.from_path(filename)
+    header = sid.header
 
-    filetype = data[:4].decode('ascii')
-    version = data[5]
-    print('SID type: {0} (version {1})'.format(filetype, version))
+    print(f'SID type: {header.magicID} (version {header.version})')
 
-    if filetype == 'RSID':
+    if header.magicID == 'RSID':
         print('Warning: RSID files may not play properly. YMMV.')
 
-    dataoffset = (data[6] << 8) | data[7]
-    print('Data offset: {0:04X}'.format(dataoffset))
+    print(f'Data offset: {header.dataOffset:04X}')
+    print(f'Load address: {header.loadAddress:04X}')
+    print(f'Init address: {header.initAddress:04X}')
+    print(f'Play address: {header.playAddress:04X}')
 
-    loadaddress = (data[8] << 8) | data[9]
-    print('Load address: {0:04X}'.format(loadaddress))
+    print(f'Found {header.songs} song(s) (default song is {header.startSong})')
+    if song < 1 or song > header.songs:
+        if song != -1:
+            print(f'Invalid song specific ({song}), playing the start song instead ({header.startSong})')
+        song = header.startSong
 
-    initaddress = (data[10] << 8) | data[11]
-    print('Init address: {0:04X}'.format(initaddress))
+    print(f'Song {song} selected')
 
-    playaddress = (data[12] << 8) | data[13]
-    print('Play address: {0:04X}'.format(playaddress))
+    #print('Speed: {0:08X}'.format(header.speed))
+    song_speed = (header.speed >> (song - 1)) & 0x1
 
-    songs = (data[14] << 8) | data[15]
-    defaultsong = (data[16] << 8) | data[17]
-    print('Found {0} song(s) (default song is {1})'.format(songs, defaultsong))
-    if subtune < 1 or subtune > songs:
-        subtune = defaultsong
+    if song_speed == 0:
+        if header.version >= 2:
+            video_standard = (header.flags >> 2) & 0x2
+            print(f'Video standard: {video_standard_text[video_standard]}')
 
-    speed = (data[18] << 24) | (data[19] << 16) | (data[20] << 8) | data[21]
-    print('Speed    : {0:08X}'.format(speed))
-    speedbit = (speed >> (subtune - 1)) & 1
-
-    print('Title    : {0}'.format(data[22:54].decode('latin-1').rstrip('\x00')))
-    print('Author   : {0}'.format(data[54:86].decode('latin-1').rstrip('\x00')))
-    print('Released : {0}'.format(data[86:118].decode('latin-1').rstrip('\x00')))
-
-    if speedbit == 0:
-        if version >= 2:
-            flags = (data[118] << 8) | data[119]
-            vstd = (flags & 0xC) >> 2
-            print('Video standard: {}'.format(vstdtxt[vstd]))
-            if flags & 0x8:
-                playback_hz = 60
+            if video_standard & 0x2:
+                playback_frequency = 60 # NTSC
             else:
-                playback_hz = 50
+                playback_frequency = 50 # PAL
         else:
-            playback_hz = 50
+            playback_frequency = 50 # Default for v1 is PAL
 
-        print('Using {0}Hz vertical blank interrupt.'.format(playback_hz))
+        print(f'Using {playback_frequency}Hz vertical blank interrupt.')
     else:
         print('Using the CIA 1 timer @ 60Hz.')
-        playback_hz = 60
+        playback_frequency = 60
+
+    print(f'Title    : {header.name}')
+    print(f'Author   : {header.author}')
+    print(f'Released : {header.released}')
+
+    dataOffset = 0
 
     ## Check load address
-    if loadaddress == 0:
+    if header.loadAddress == 0:
         print('Warning: SID has load address 0, reading from C64 binary data')
-        loadaddress = data[dataoffset] | (data[dataoffset + 1] << 8)
-        dataoffset += 2
-        print('New load address is {0:04X}'.format(loadaddress))
+        load_address = sid.data[0] | (sid.data[1] << 8)
+        dataOffset = 2
+        print(f'New load address is {load_address:04X}')
+    else:
+        load_address = header.loadAddress
 
     ## Check init address
-    if initaddress == 0:
+    if header.initAddress == 0:
         print('Warning: SID has init address 0, cloning load address instead')
-        initaddress = loadaddress
-        print('New init address is {0:04X}'.format(initaddress))
+        init_address = load_address
+        print(f'New init address is {init_address:04X}')
+    else:
+        init_address = header.initAddress
 
     ## Setup memory
     memory = [0] * 0x10000
     memory[0x01] = 0x37
-    for idx, byte in enumerate(data[dataoffset:]):
-        memory[loadaddress + idx] = byte
+    for idx, byte in enumerate(sid.data[dataOffset:]):
+        memory[load_address + idx] = byte
 
     ## Setup CPU
     cpu = mpu6502.MPU(memory)
 
     ## Init SID tune
-    print('Initializing song {0}...'.format(subtune))
-    runCPU(cpu, initaddress, subtune - 1, 0, 0)
+    print(f'Initializing song {song}...')
+    run_cpu(cpu, init_address, song - 1, 0, 0)
 
     ## Check play address
-    if playaddress == 0:
+    if header.playAddress == 0:
         print('Warning: SID has play address 0, reading from interrupt vector')
-        if (memory[0x01] & 0x07) == 0x5:
-            playaddress = memory[0xfffe] | (memory[0xffff] << 8)
+
+        if (memory[0x01] & 0x07) == 0x05:
+            play_address = memory[0xfffe] | (memory[0xffff] << 8)
         else:
-            playaddress = memory[0x314] | (memory[0x315] << 8)
-        print('New play address is {0:04X}'.format(playaddress))
+            play_address = memory[0x314] | (memory[0x315] << 8)
+
+        print(f'New play address is {play_address:04X}')
+    else:
+        play_address = header.playAddress
 
     ## Init RealSIDShield and wait for it to reset properly
-    print('Using serial port {0} at {1} baud...'.format(serialport, baudrate))
+    print(f'Using serial port {serial_port} at {baud_rate} baud...')
     print('Initializing serial connection to the Arduino...')
-    ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=0.1)
-    time.sleep(0.01)
-    ser.reset_input_buffer()
+    serial = Serial(port=serial_port, baudrate=baud_rate, timeout=0.1)
+    sleep(0.01)
+    serial.reset_input_buffer()
 
     print('Connecting...', end='', flush=True)
     retries = 30
-    while ser.read() != b'?' and retries > 0:
+    while serial.read() != b'?' and retries > 0:
         retries -= 1
         print('.', end='', flush=True)
 
@@ -173,41 +178,39 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
 
     if retries == 0:
         print('Connection timed out')
-        ser.close()
+        serial.close()
         return
 
     ## Configure the speed
-    update_ms = round(1000 / playback_hz)
-
-    cmd = [0] * 26
-    cmd[0] = 1 # type=config
-    cmd[1] = update_ms
-    ser.write(cmd)
-    ser.flush()
+    config_cmd = [0] * 26
+    config_cmd[0] = 1 # type=config
+    config_cmd[1] = round(1000 / playback_frequency)
+    serial.write(config_cmd)
+    serial.flush()
 
     ## Play SID tune!
-    if playseconds == -1:
+    if play_seconds == -1:
         print('Playing...')
     else:
-        print('Playing for {0} seconds...'.format(playseconds))
+        print(f'Playing for {play_seconds} seconds...')
+
     play_calls = 0
     retries = 10
-    while (playseconds == -1 or play_calls < playseconds * playback_hz) and retries > 0:
+
+    while (play_seconds == -1 or play_calls < play_seconds * playback_frequency) and retries > 0:
         try:
-            request = ser.read()
+            request = serial.read()
         except KeyboardInterrupt:
-            cmd = [0] * 26
-            cmd[0] = 1 # type=config
-            cmd[1] = update_ms
-            ser.write(cmd)
-            ser.flush()
+            # config_cmd resets the SID, which stops the sound
+            serial.write(config_cmd)
+            serial.flush()
             break
 
         if request == b'?':
-            runCPU(cpu, playaddress, 0, 0, 0)
-            ser.write([0]) # type=registers
-            ser.write(memory[0xD400:0xD419])
-            ser.flush()
+            run_cpu(cpu, play_address, 0, 0, 0)
+            serial.write([0]) # type=registers
+            serial.write(memory[0xD400:0xD419])
+            serial.flush()
             play_calls += 1
             retries = 10
         else:
@@ -217,11 +220,11 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     if retries == 0:
         print('Connection timed out')
 
-    ser.close()
+    serial.close()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='RealSID.py v1.0 - A very rudimentary SID player'+\
+    parser = ArgumentParser(description='RealSID.py v1.0 - A very rudimentary SID player'+\
                                                  ' for the RealSIDShield (c) 2013 atbrask')
 
     parser.add_argument('serialport', help='The serial port the Arduino is connected to')
@@ -235,4 +238,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    playsid(args.filename, args.song, args.time, args.serialport, args.baudrate)
+    play_sid(args.filename, args.song, args.time, args.serialport, args.baudrate)
