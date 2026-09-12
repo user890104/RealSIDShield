@@ -160,6 +160,7 @@ def playsid(filename, subtune, playseconds, serialport, baudrate):
     print('Using serial port {0} at {1} baud...'.format(serialport, baudrate))
     print('Initializing serial connection to the Arduino...')
     ser = serial.Serial(port=serialport, baudrate=baudrate, timeout=0.1)
+    ser.reset_input_buffer()
 
     print('Connecting...', end='', flush=True)
     retries = 30
