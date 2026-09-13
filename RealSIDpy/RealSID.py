@@ -35,7 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from time import sleep
 from argparse import ArgumentParser
-from struct import unpack
 from serial import Serial
 from py65.devices import mpu6502
 from SID import Sid, PROGRAM_DATA_ADDRESS

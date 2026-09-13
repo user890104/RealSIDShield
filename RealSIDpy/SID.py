@@ -77,8 +77,7 @@ class SidHeader:
 
             v2_fields = [
                 f for f in fields(cls)
-                if f.metadata.get('version', 1) > 1
-                and f.metadata.get('version', 1) <= version
+                if 1 < f.metadata.get('version', 1) <= version
             ]
 
             values.update(dict(zip(
