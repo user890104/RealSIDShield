@@ -1,3 +1,7 @@
+"""
+SID.py
+"""
+
 from struct import Struct
 from dataclasses import dataclass, field, fields
 from os import PathLike
