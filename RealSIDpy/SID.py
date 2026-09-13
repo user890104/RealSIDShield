@@ -47,6 +47,9 @@ class SidHeader:
 
     @classmethod
     def from_bytes(cls, data):
+        if len(data) < HEADER_V1.size:
+            raise ValueError(f'SID file is too short: {len(data)} bytes (minimum {HEADER_V1.size})')
+
         v1_fields = [
             f for f in fields(cls)
             if f.metadata.get('version', 1) == 1
@@ -57,13 +60,19 @@ class SidHeader:
             HEADER_V1.unpack(data[:HEADER_V1.size]),
         ))
 
-        values['magicID'] = values['magicID'].decode('ascii')
         version = values['version']
+        if version not in (1, 2, 3, 4):
+            raise ValueError(f'Unsupported SID version: {version}')
+
+        values['magicID'] = values['magicID'].decode('ascii')
 
         for key in ('name', 'author', 'released'):
             values[key] = values[key].rstrip(b'\0').decode('latin-1')
 
         if version >= 2:
+            if len(data) < HEADER_V1.size + HEADER_V2.size:
+                raise ValueError(f'SID file is too short for version {version} header')
+
             v2_fields = [
                 f for f in fields(cls)
                 if f.metadata.get('version', 1) > 1
@@ -92,8 +101,11 @@ class SidHeader:
         if self.magicID == 'RSID' and (self.initAddress >= 0xA000 and self.initAddress < 0xC000 or self.initAddress >= 0xD000 or self.initAddress < 0x07E8):
             raise ValueError(f'Wrong initAddress for RSID: {self.initAddress:04X}')
 
-        if self.songs < 1 or self.songs > 256:
+        if not 1 <= self.songs <= 256:
             raise ValueError(f'Invalid number of songs: {self.songs}')
+
+        if not 1 <= self.startSong <= self.songs:
+            raise ValueError(f'Invalid startSong: {self.startSong} (songs={self.songs})')
 
 @dataclass
 class Sid:

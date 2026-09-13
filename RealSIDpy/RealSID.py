@@ -138,7 +138,12 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     ## Setup memory
     memory = [0] * 0x10000
     memory[0x01] = 0x37
-    for idx, byte in enumerate(sid.data[data_offset:]):
+    program = sid.data[data_offset:]
+
+    if load_address + len(program) > 0x10000:
+        raise ValueError(f'SID data does not fit in C64 memory: {load_address:04X} + {len(program):04X}')
+
+    for idx, byte in enumerate(program):
         memory[load_address + idx] = byte
 
     ## Setup CPU
