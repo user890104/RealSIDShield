@@ -108,6 +108,14 @@ class SidHeader:
         if not 1 <= self.startSong <= self.songs:
             raise ValueError(f'Invalid startSong: {self.startSong} (songs={self.songs})')
 
+    def speed_for_song(self, song):
+        if self.version <= 2 or (self.flags & 0x02):
+            bit = (song - 1) % 32
+        else:
+            bit = min(song - 1, 31)
+
+        return (self.speed >> bit) & 1
+
 @dataclass
 class Sid:
     header: SidHeader

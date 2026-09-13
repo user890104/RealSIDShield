@@ -94,7 +94,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     print(f'Song {song} selected')
 
     #print('Speed: {0:08X}'.format(header.speed))
-    song_speed = (header.speed >> (song - 1)) & 0x1
+    song_speed = header.speed_for_song(song)
 
     if song_speed == 0:
         if header.version >= 2:
