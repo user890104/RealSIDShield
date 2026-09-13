@@ -26,6 +26,7 @@ HEADER_V2 = Struct(
 
 PROGRAM_DATA_ADDRESS = Struct('<H')
 
+
 @dataclass
 class SidHeader:
     magicID: str
@@ -115,6 +116,7 @@ class SidHeader:
             bit = min(song - 1, 31)
 
         return (self.speed >> bit) & 1
+
 
 @dataclass
 class Sid:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''
+"""
 RealSID.py
 Version 1.0
 
@@ -31,7 +31,7 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-'''
+"""
 
 from time import sleep
 from argparse import ArgumentParser
@@ -41,6 +41,7 @@ from py65.devices import mpu6502
 from SID import Sid, PROGRAM_DATA_ADDRESS
 
 video_standard_text = ['Unknown', 'PAL', 'NTSC', 'PAL/NTSC']
+
 
 def run_cpu(cpu, new_pc, new_a, new_x, new_y):
     cpu.pc = new_pc
@@ -52,26 +53,27 @@ def run_cpu(cpu, new_pc, new_a, new_x, new_y):
     instruction_count = 0
 
     while running and instruction_count < 1_000_000:
-        ## Test for return instructions RTI (0x40) and RTS (0x60)
+        # Test for return instructions RTI (0x40) and RTS (0x60)
         if cpu.ByteAt(cpu.pc) in (0x40, 0x60) and cpu.sp == 0xFF:
             running = False
 
-        ## Test for BRK (0x00)
+        # Test for BRK (0x00)
         if cpu.ByteAt(cpu.pc) == 0x00:
             running = False
 
-        ## Step one instruction
+        # Step one instruction
         cpu.step()
         instruction_count += 1
 
-        ## Test for jump into Kernal interrupt handler exit
+        # Test for jump into Kernel interrupt handler exit
         if (cpu.ByteAt(0x01) & 0x07) != 0x05 and cpu.pc in (0xea31, 0xea81):
             running = False
 
     return instruction_count
 
+
 def play_sid(filename, song, play_seconds, port, baud_rate):
-    ## Parse file
+    # Parse file
     sid = Sid.from_path(filename)
     header = sid.header
 
@@ -93,7 +95,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
 
     print(f'Song {song} selected')
 
-    #print('Speed: {0:08X}'.format(header.speed))
+    # print('Speed: {0:08X}'.format(header.speed))
     song_speed = header.speed_for_song(song)
 
     if song_speed == 0:
@@ -102,13 +104,13 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
             print(f'Video standard: {video_standard_text[video_standard]}')
 
             if video_standard == 1:
-                playback_frequency = 50 # PAL
-            if video_standard == 2:
-                playback_frequency = 60 # NTSC
+                playback_frequency = 50  # PAL
+            elif video_standard == 2:
+                playback_frequency = 60  # NTSC
             else:
-                playback_frequency = 50 # Unknown or PAL/NTSC
+                playback_frequency = 50  # Unknown or PAL/NTSC
         else:
-            playback_frequency = 50 # Default for v1 is PAL
+            playback_frequency = 50  # Default for v1 is PAL
 
         print(f'Using {playback_frequency}Hz vertical blank interrupt.')
     else:
@@ -121,7 +123,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
 
     data_offset = 0
 
-    ## Check load address
+    # Check load address
     if header.loadAddress == 0:
         print('Warning: SID has load address 0, reading from C64 binary data')
         load_address = PROGRAM_DATA_ADDRESS.unpack(sid.data[:2])[0]
@@ -130,7 +132,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     else:
         load_address = header.loadAddress
 
-    ## Check init address
+    # Check init address
     if header.initAddress == 0:
         print('Warning: SID has init address 0, cloning load address instead')
         init_address = load_address
@@ -138,7 +140,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     else:
         init_address = header.initAddress
 
-    ## Setup memory
+    # Setup memory
     memory = [0] * 0x10000
     memory[0x01] = 0x37
     program = sid.data[data_offset:]
@@ -148,14 +150,14 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
 
     memory[load_address:load_address + len(program)] = program
 
-    ## Setup CPU
+    # Setup CPU
     cpu = mpu6502.MPU(memory)
 
-    ## Init SID tune
+    # Init SID tune
     print(f'Initializing song {song}...')
     run_cpu(cpu, init_address, song - 1, 0, 0)
 
-    ## Check play address
+    # Check play address
     if header.playAddress == 0:
         print('Warning: SID has play address 0, reading from interrupt vector')
 
@@ -168,7 +170,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     else:
         play_address = header.playAddress
 
-    ## Init RealSIDShield and wait for it to reset properly
+    # Init RealSIDShield and wait for it to reset properly
     print(f'Using serial port {port} at {baud_rate} baud...')
     print('Initializing serial connection to the Arduino...')
     serial_port = Serial(port=port, baudrate=baud_rate, timeout=0.1)
@@ -188,14 +190,14 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
         serial_port.close()
         return
 
-    ## Configure the speed
+    # Configure the speed
     config_cmd = [0] * 26
-    config_cmd[0] = 1 # type=config
+    config_cmd[0] = 1  # type=config
     config_cmd[1] = round(1000 / playback_frequency)
     serial_port.write(config_cmd)
     serial_port.flush()
 
-    ## Play SID tune!
+    # Play SID tune!
     if play_seconds == -1:
         print('Playing...')
     else:
@@ -215,7 +217,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
 
         if request == b'?':
             run_cpu(cpu, play_address, 0, 0, 0)
-            serial_port.write([0]) # type=registers
+            serial_port.write([0])  # type=registers
             serial_port.write(memory[0xD400:0xD419])
             serial_port.flush()
             play_calls += 1
@@ -231,8 +233,8 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='RealSID.py v1.0 - A very rudimentary SID player'+\
-                                                 ' for the RealSIDShield (c) 2013 atbrask')
+    parser = ArgumentParser(description='RealSID.py v1.0 - A very rudimentary SID player' +
+                                        ' for the RealSIDShield (c) 2013 atbrask')
 
     parser.add_argument('serialport', help='The serial port the Arduino is connected to')
     parser.add_argument('filename', help='Input SID file')
