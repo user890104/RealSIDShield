@@ -35,9 +35,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from time import sleep
 from argparse import ArgumentParser
+from struct import unpack
 from serial import Serial
 from py65.devices import mpu6502
-from SID import Sid
+from SID import Sid, PROGRAM_DATA_ADDRESS
 
 video_standard_text = ['Unknown', 'PAL', 'NTSC', 'PAL/NTSC']
 
@@ -123,7 +124,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     ## Check load address
     if header.loadAddress == 0:
         print('Warning: SID has load address 0, reading from C64 binary data')
-        load_address = sid.data[0] | (sid.data[1] << 8)
+        load_address = PROGRAM_DATA_ADDRESS.unpack(sid.data[:2])[0]
         data_offset = 2
         print(f'New load address is {load_address:04X}')
     else:
@@ -160,9 +161,9 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
         print('Warning: SID has play address 0, reading from interrupt vector')
 
         if (memory[0x01] & 0x07) == 0x05:
-            play_address = memory[0xfffe] | (memory[0xffff] << 8)
+            play_address = PROGRAM_DATA_ADDRESS.unpack(memory[0xfffe:0x10000])[0]
         else:
-            play_address = memory[0x314] | (memory[0x315] << 8)
+            play_address = PROGRAM_DATA_ADDRESS.unpack(memory[0x314:0x316])[0]
 
         print(f'New play address is {play_address:04X}')
     else:

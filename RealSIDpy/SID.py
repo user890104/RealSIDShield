@@ -24,6 +24,8 @@ HEADER_V2 = Struct(
     'B'      # thirdSIDAddress
 )
 
+PROGRAM_DATA_ADDRESS = Struct('<H')
+
 @dataclass
 class SidHeader:
     magicID: str
