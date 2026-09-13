@@ -160,9 +160,9 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
         print('Warning: SID has play address 0, reading from interrupt vector')
 
         if (memory[0x01] & 0x07) == 0x05:
-            play_address = PROGRAM_DATA_ADDRESS.unpack(memory[0xfffe:0x10000])[0]
+            play_address = PROGRAM_DATA_ADDRESS.unpack(bytes(memory[0xfffe:0x10000]))[0]
         else:
-            play_address = PROGRAM_DATA_ADDRESS.unpack(memory[0x314:0x316])[0]
+            play_address = PROGRAM_DATA_ADDRESS.unpack(bytes(memory[0x314:0x316]))[0]
 
         print(f'New play address is {play_address:04X}')
     else:
