@@ -100,10 +100,12 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
             video_standard = (header.flags >> 2) & 0x3
             print(f'Video standard: {video_standard_text[video_standard]}')
 
-            if video_standard & 0x2:
+            if video_standard == 1:
+                playback_frequency = 50 # PAL
+            if video_standard == 2:
                 playback_frequency = 60 # NTSC
             else:
-                playback_frequency = 50 # PAL
+                playback_frequency = 50 # Unknown or PAL/NTSC
         else:
             playback_frequency = 50 # Default for v1 is PAL
 
