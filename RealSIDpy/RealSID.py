@@ -87,7 +87,7 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     print(f'Play address: {header.playAddress:04X}')
 
     print(f'Found {header.songs} song(s) (default song is {header.startSong})')
-    if song < 1 or song > header.songs:
+    if not 1 <= song <= header.songs:
         if song != -1:
             print(f'Invalid song specific ({song}), playing the start song instead ({header.startSong})')
         song = header.startSong
@@ -125,6 +125,10 @@ def play_sid(filename, song, play_seconds, port, baud_rate):
     # Check load address
     if header.loadAddress == 0:
         print('Warning: SID has load address 0, reading from C64 binary data')
+
+        if len(sid.data) < 2:
+            raise ValueError('SID data is missing the embedded C64 load address')
+
         load_address = PROGRAM_DATA_ADDRESS.unpack(sid.data[:2])[0]
         data_offset = 2
         print(f'New load address is {load_address:04X}')
