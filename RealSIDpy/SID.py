@@ -114,7 +114,11 @@ class Sid:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        header = SidHeader.from_bytes(data)
+        header = SidHeader.from_bytes(data[:HEADER_V1.size + HEADER_V2.size])
+
+        if len(data) < header.dataOffset:
+            raise ValueError(f'SID dataOffset {header.dataOffset:04X} exceeds file size {len(data):04X}')
+
         sid_data = data[header.dataOffset:]
 
         return cls(
