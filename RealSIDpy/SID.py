@@ -1,28 +1,27 @@
-import struct
-
+from struct import Struct
 from dataclasses import dataclass, field, fields
 
-HEADER_V1 = struct.Struct(
-    ">4s"    # magicID
-    "H"      # version
-    "H"      # dataOffset
-    "H"      # loadAddress
-    "H"      # initAddress
-    "H"      # playAddress
-    "H"      # songs
-    "H"      # startSong
-    "I"      # speed
-    "32s"    # name
-    "32s"    # author
-    "32s"    # released
+HEADER_V1 = Struct(
+    '>4s'    # magicID
+    'H'      # version
+    'H'      # dataOffset
+    'H'      # loadAddress
+    'H'      # initAddress
+    'H'      # playAddress
+    'H'      # songs
+    'H'      # startSong
+    'I'      # speed
+    '32s'    # name
+    '32s'    # author
+    '32s'    # released
 )
 
-HEADER_V2 = struct.Struct(
-    ">H"     # flags
-    "B"      # startPage
-    "B"      # pageLength
-    "B"      # secondSIDAddress
-    "B"      # thirdSIDAddress
+HEADER_V2 = Struct(
+    '>H'     # flags
+    'B'      # startPage
+    'B'      # pageLength
+    'B'      # secondSIDAddress
+    'B'      # thirdSIDAddress
 )
 
 @dataclass
